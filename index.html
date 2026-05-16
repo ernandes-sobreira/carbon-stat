@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CarbonStat — Análise Estatística de Carbono em Águas</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#ffffff; --surface:#f8f9fa; --border:#e0e4ea;
+    --accent:#1a6fdf; --accent2:#0ea47a; --accent3:#e85d26; --accent4:#8b46d4;
+    --text:#1a1d23; --text-soft:#6b7280; --text-muted:#9ca3af;
+    --warn:#d97706; --success:#059669;
+    --card-shadow:0 1px 4px rgba(0,0,0,.07),0 4px 16px rgba(0,0,0,.04);
+    --radius:10px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:15px;line-height:1.55;}
+  header{background:var(--bg);border-bottom:2px solid var(--accent);padding:0 28px;display:flex;align-items:center;justify-content:space-between;height:58px;position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(26,111,223,.08);}
+  .logo{display:flex;align-items:center;gap:12px;}
+  .logo-icon{width:36px;height:36px;background:var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center;color:white;font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:600;}
+  .logo-text{font-weight:700;font-size:18px;letter-spacing:-.3px;}
+  .logo-sub{font-size:11px;color:var(--text-soft);font-weight:400;margin-top:-2px;}
+  .header-badge{font-size:11px;background:#eef4ff;color:var(--accent);border:1px solid #c7dcff;padding:3px 10px;border-radius:20px;font-weight:500;}
+  .main-wrap{max-width:1200px;margin:0 auto;padding:28px 20px 60px;}
+  .upload-zone{border:2px dashed var(--border);border-radius:var(--radius);padding:36px 28px;text-align:center;cursor:pointer;transition:.2s;background:var(--surface);margin-bottom:24px;position:relative;}
+  .upload-zone:hover,.upload-zone.drag{border-color:var(--accent);background:#f0f6ff;}
+  .upload-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;}
+  .upload-icon{font-size:34px;margin-bottom:8px;}
+  .upload-zone h2{font-size:16px;font-weight:600;}
+  .upload-zone p{color:var(--text-soft);font-size:13px;margin-top:5px;}
+  .upload-spec{display:flex;gap:8px;justify-content:center;margin-top:12px;flex-wrap:wrap;}
+  .tag{font-size:11px;font-family:'IBM Plex Mono',monospace;background:white;border:1px solid var(--border);padding:2px 8px;border-radius:4px;color:var(--text-soft);}
+  #col-map-section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 22px;margin-bottom:22px;display:none;}
+  #col-map-section h3{font-size:14px;font-weight:600;margin-bottom:10px;color:var(--accent);}
+  .col-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:9px;}
+  .col-item label{font-size:12px;color:var(--text-soft);display:block;margin-bottom:3px;}
+  .col-item select{width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:white;color:var(--text);}
+  .col-item select:focus{outline:2px solid var(--accent);border-color:transparent;}
+  .btn-primary{background:var(--accent);color:white;border:none;padding:9px 22px;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;transition:.15s;margin-top:13px;font-family:inherit;}
+  .btn-primary:hover{background:#1558bf;}
+  .btn-sm{padding:5px 13px;margin-top:0;font-size:13px;}
+  #dashboard{display:none;}
+  .tab-nav{display:flex;gap:3px;border-bottom:2px solid var(--border);margin-bottom:22px;flex-wrap:wrap;}
+  .tab-btn{padding:8px 13px;border:none;background:none;font-size:13px;font-weight:500;color:var(--text-soft);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:.15s;border-radius:6px 6px 0 0;font-family:inherit;}
+  .tab-btn:hover{color:var(--accent);background:#f0f6ff;}
+  .tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);background:#f0f6ff;}
+  .tab-panel{display:none;}
+  .tab-panel.active{display:block;}
+  .stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(165px,1fr));gap:12px;margin-bottom:22px;}
+  .stat-card{background:white;border:1px solid var(--border);border-radius:var(--radius);padding:15px;box-shadow:var(--card-shadow);}
+  .stat-card .label{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;}
+  .stat-card .value{font-size:20px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:var(--accent);margin:3px 0 0;}
+  .stat-card .sub{font-size:11px;color:var(--text-soft);}
+  .sec-header{display:flex;align-items:center;gap:10px;margin-bottom:14px;margin-top:24px;}
+  .sec-header:first-child{margin-top:0;}
+  .sec-header h3{font-size:15px;font-weight:700;}
+  .sec-badge{font-size:11px;padding:2px 9px;border-radius:20px;font-weight:500;}
+  .badge-blue{background:#eef4ff;color:var(--accent);border:1px solid #c7dcff;}
+  .badge-green{background:#ecfdf5;color:var(--success);border:1px solid #a7f3d0;}
+  .badge-orange{background:#fff7ed;color:var(--warn);border:1px solid #fed7aa;}
+  .result-box{background:white;border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;margin-bottom:12px;box-shadow:var(--card-shadow);}
+  .result-box h4{font-size:13px;font-weight:600;margin-bottom:9px;color:var(--text);}
+  .result-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);font-size:13px;flex-wrap:wrap;gap:4px;}
+  .result-row:last-child{border-bottom:none;}
+  .result-row .rk{color:var(--text-soft);}
+  .result-row .rv{font-family:'IBM Plex Mono',monospace;font-weight:600;text-align:right;}
+  .sig-chip{font-size:11px;padding:2px 8px;border-radius:20px;margin-left:6px;display:inline-block;white-space:nowrap;}
+  .sig-yes{background:#ecfdf5;color:#059669;border:1px solid #6ee7b7;}
+  .sig-no{background:#f9fafb;color:#9ca3af;border:1px solid #e5e7eb;}
+  .sig-warn{background:#fffbeb;color:#d97706;border:1px solid #fde68a;}
+  .chart-card{background:white;border:1px solid var(--border);border-radius:var(--radius);padding:18px;box-shadow:var(--card-shadow);margin-bottom:14px;}
+  .chart-card h4{font-size:12px;font-weight:600;margin-bottom:12px;color:var(--text-soft);}
+  .chart-wrap{position:relative;height:280px;}
+  .controls-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;align-items:center;}
+  .controls-bar label{font-size:12px;color:var(--text-soft);}
+  .controls-bar select{padding:5px 9px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:white;font-family:inherit;color:var(--text);}
+  .tbl-wrap{overflow-x:auto;}
+  table{width:100%;border-collapse:collapse;font-size:12px;}
+  th{background:var(--surface);padding:8px 11px;text-align:left;font-weight:600;font-size:11px;border-bottom:2px solid var(--border);white-space:nowrap;}
+  td{padding:7px 11px;border-bottom:1px solid var(--border);font-family:'IBM Plex Mono',monospace;font-size:12px;}
+  tr:last-child td{border-bottom:none;}
+  tr:hover td{background:#f8faff;}
+  .notice{font-size:12px;padding:9px 13px;border-radius:6px;margin:8px 0;line-height:1.5;}
+  .notice-warn{background:#fffbeb;border:1px solid #fde68a;color:#92400e;}
+  .notice-info{background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;}
+  .notice-ok{background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46;}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  @media(max-width:680px){.grid2{grid-template-columns:1fr;}}
+  #loading{position:fixed;inset:0;background:rgba(255,255,255,.92);display:none;align-items:center;justify-content:center;z-index:999;flex-direction:column;gap:14px;}
+  #loading.show{display:flex;}
+  .spinner{width:38px;height:38px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+</style>
+</head>
+<body>
+<div id="loading"><div class="spinner"></div><span style="font-size:14px;color:var(--text-soft)">Processando análises...</span></div>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">C²</div>
+    <div><div class="logo-text">CarbonStat</div><div class="logo-sub">Análise Estatística de Carbono em Águas</div></div>
+  </div>
+  <span class="header-badge">CH₄ &amp; CO₂ · Mesocosmos</span>
+</header>
+
+<div class="main-wrap">
+  <div class="upload-zone" id="dropzone">
+    <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
+    <div class="upload-icon">📁</div>
+    <h2>Arraste ou clique para selecionar a planilha</h2>
+    <p>Formatos: .xlsx, .xls, .csv</p>
+    <div class="upload-spec">
+      <span class="tag">Data</span><span class="tag">Tratamento</span>
+      <span class="tag">CH4_media</span><span class="tag">CO2_media</span><span class="tag">DP, min, max</span>
+    </div>
+  </div>
+
+  <div id="col-map-section">
+    <h3>Mapeamento de Colunas</h3>
+    <p style="font-size:12px;color:var(--text-soft);margin-bottom:10px">Apenas Data, Variável 1 e Tratamento são obrigatórios.</p>
+    <div class="col-grid" id="col-grid"></div>
+    <button class="btn-primary" onclick="runAnalysis()">▶ Executar Análises</button>
+  </div>
+
+  <div id="dashboard">
+    <div class="tab-nav">
+      <button class="tab-btn active" onclick="switchTab('overview',this)">📊 Painel Geral</button>
+      <button class="tab-btn" onclick="switchTab('normality',this)">📐 Normalidade</button>
+      <button class="tab-btn" onclick="switchTab('ttest',this)">⚖️ Teste t</button>
+      <button class="tab-btn" onclick="switchTab('anova',this)">🔬 ANOVA</button>
+      <button class="tab-btn" onclick="switchTab('regression',this)">📈 Regressão</button>
+      <button class="tab-btn" onclick="switchTab('timeseries',this)">⏱️ Série Temporal</button>
+      <button class="tab-btn" onclick="switchTab('pettitt',this)">⚡ Pettitt</button>
+      <button class="tab-btn" onclick="switchTab('nonparam',this)">🃏 Não-Param.</button>
+      <button class="tab-btn" onclick="switchTab('rawdata',this)">🗃️ Dados</button>
+    </div>
+
+    <div class="tab-panel active" id="tab-overview">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <label style="font-size:13px;color:var(--text-soft);font-weight:500;">Variável do painel:</label>
+          <select id="overview-var" onchange="renderOverview()" style="padding:5px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:white;font-family:inherit;color:var(--text);"></select>
+        </div>
+        <button onclick="showUpload()" style="background:var(--surface);color:var(--text-soft);border:1px solid var(--border);padding:6px 14px;border-radius:8px;font-size:12px;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px;">
+          ↩ Nova planilha
+        </button>
+      </div>
+      <div id="stat-cards" class="stat-grid"></div>
+      <div class="grid2">
+        <div class="chart-card"><h4 id="chart-box-title">Média por tratamento</h4><div class="chart-wrap"><canvas id="chart-box"></canvas></div></div>
+        <div class="chart-card"><h4>Evolução temporal por tratamento</h4><div class="chart-wrap"><canvas id="chart-time"></canvas></div></div>
+      </div>
+      <div class="chart-card" id="scatter-card" style="display:none">
+        <h4>Dispersão Variável 1 × Variável 2</h4>
+        <div class="chart-wrap" style="height:240px"><canvas id="chart-scatter"></canvas></div>
+      </div>
+    </div>
+
+    <div class="tab-panel" id="tab-normality">
+      <div class="sec-header"><h3>Normalidade</h3><span class="sec-badge badge-blue">Shapiro-Wilk</span></div>
+      <div class="notice notice-info">α = 0.05. W próximo de 1 = distribuição normal. Valores negativos (sumidouros) podem impactar resultados.</div>
+      <div id="normality-results"></div>
+    </div>
+
+    <div class="tab-panel" id="tab-ttest">
+      <div class="sec-header"><h3>Teste t de Welch</h3><span class="sec-badge badge-blue">Bicaudal · variâncias desiguais</span></div>
+      <div class="controls-bar">
+        <label>Variável:</label><select id="tt-var"></select>
+        <label>Grupo A:</label><select id="tt-groupA"></select>
+        <label>Grupo B:</label><select id="tt-groupB"></select>
+        <button class="btn-primary btn-sm" onclick="runTTest()">Calcular</button>
+      </div>
+      <div id="ttest-results"></div>
+    </div>
+
+    <div class="tab-panel" id="tab-anova">
+      <div class="sec-header"><h3>ANOVA One-Way</h3><span class="sec-badge badge-green">+ Tukey HSD</span></div>
+      <div class="controls-bar">
+        <label>Variável:</label><select id="anova-var"></select>
+        <button class="btn-primary btn-sm" onclick="runANOVA()">Calcular</button>
+      </div>
+      <div id="anova-results"></div>
+    </div>
+
+    <div class="tab-panel" id="tab-regression">
+      <div class="sec-header"><h3>Regressão Linear</h3><span class="sec-badge badge-blue">Y = a + bX</span></div>
+      <div class="controls-bar">
+        <label>X:</label><select id="reg-x"></select>
+        <label>Y:</label><select id="reg-y"></select>
+        <label>Tratamento:</label><select id="reg-trat"></select>
+        <button class="btn-primary btn-sm" onclick="runRegression()">Calcular</button>
+      </div>
+      <div id="regression-results"></div>
+      <div class="chart-card" style="margin-top:12px">
+        <h4>Dispersão com linha de regressão</h4>
+        <div class="chart-wrap" style="height:260px"><canvas id="chart-reg"></canvas></div>
+      </div>
+    </div>
+
+    <div class="tab-panel" id="tab-timeseries">
+      <div class="sec-header"><h3>Série Temporal</h3><span class="sec-badge badge-orange">Tendência + CV + Spearman</span></div>
+      <div class="controls-bar">
+        <label>Variável:</label><select id="ts-var"></select>
+        <label>Tratamento:</label><select id="ts-trat"></select>
+        <button class="btn-primary btn-sm" onclick="runTimeSeries()">Calcular</button>
+      </div>
+      <div id="ts-results"></div>
+      <div class="chart-card" style="margin-top:12px">
+        <h4>Série com tendência linear</h4>
+        <div class="chart-wrap"><canvas id="chart-ts"></canvas></div>
+      </div>
+    </div>
+
+    <div class="tab-panel" id="tab-pettitt">
+      <div class="sec-header"><h3>Teste de Pettitt</h3><span class="sec-badge badge-orange">Mudança abrupta</span></div>
+      <div class="notice notice-warn">⚠️ Baixo poder para n &lt; 20. Com 7 datas, identifica o ponto candidato mas o p-valor é indicativo, não conclusivo.</div>
+      <div class="controls-bar">
+        <label>Variável:</label><select id="pet-var"></select>
+        <label>Tratamento:</label><select id="pet-trat"></select>
+        <button class="btn-primary btn-sm" onclick="runPettitt()">Calcular</button>
+      </div>
+      <div id="pettitt-results"></div>
+      <div class="chart-card" style="margin-top:12px">
+        <h4>Série com ponto de mudança</h4>
+        <div class="chart-wrap"><canvas id="chart-pet"></canvas></div>
+      </div>
+    </div>
+
+    <div class="tab-panel" id="tab-nonparam">
+      <div class="sec-header"><h3>Não-Paramétricos</h3><span class="sec-badge badge-blue">Kruskal-Wallis · Mann-Whitney · Spearman</span></div>
+      <div class="notice notice-info">Recomendados quando normalidade é rejeitada ou n é pequeno.</div>
+      <div class="controls-bar">
+        <label>Variável:</label><select id="np-var"></select>
+        <button class="btn-primary btn-sm" onclick="runNonParam()">Calcular</button>
+      </div>
+      <div id="nonparam-results"></div>
+    </div>
+
+    <div class="tab-panel" id="tab-rawdata">
+      <div class="sec-header"><h3>Dados Carregados</h3></div>
+      <div id="raw-info" style="font-size:12px;color:var(--text-soft);margin-bottom:10px;font-family:'IBM Plex Mono',monospace;"></div>
+      <div class="tbl-wrap"><table id="raw-table"><thead></thead><tbody></tbody></table></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// STATE
+// ============================================================
+let RAW=[], COLS={}, TREATS=[], DATES=[], ALL_NUM_COLS=[];
+let chartBox,chartTime,chartScatter,chartReg,chartTs,chartPet;
+const COLORS=['#1a6fdf','#0ea47a','#e85d26','#8b46d4','#f59e0b','#06b6d4'];
+
+// ============================================================
+// MATH
+// ============================================================
+const _mean=a=>a.reduce((s,x)=>s+x,0)/a.length;
+const _sum =a=>a.reduce((s,x)=>s+x,0);
+const _sVar=a=>{const m=_mean(a);return a.reduce((s,x)=>s+(x-m)**2,0)/(a.length-1);};
+const _sStd=a=>Math.sqrt(_sVar(a));
+const _med =a=>{const s=[...a].sort((x,y)=>x-y),n=s.length;return n%2===0?(s[n/2-1]+s[n/2])/2:s[Math.floor(n/2)];};
+const _q   =(a,p)=>{const s=[...a].sort((x,y)=>x-y),pos=(s.length-1)*p,lo=Math.floor(pos),hi=Math.ceil(pos);return s[lo]+(s[hi]-s[lo])*(pos-lo);};
+
+function normalCDF(z){const t=1/(1+0.2316419*Math.abs(z));const p=1-0.3989422803*Math.exp(-.5*z*z)*t*(0.319381530+t*(-0.356563782+t*(1.781477937+t*(-1.821255978+t*1.330274429))));return z<0?1-p:p;}
+function lgamma(z){const c=[76.18009172947146,-86.50532032941677,24.01409824083091,-1.231739572450155,0.1208650973866179e-2,-0.5395239384953e-5];let y=z,x=z,tmp=x+5.5;tmp-=(x+.5)*Math.log(tmp);let ser=1.000000000190015;for(let j=0;j<6;j++)ser+=c[j]/++y;return -tmp+Math.log(2.5066282746310005*ser/x);}
+function incompleteBeta(a,b,x){if(x<=0)return 0;if(x>=1)return 1;const lbeta=lgamma(a)+lgamma(b)-lgamma(a+b),front=Math.exp(Math.log(x)*a+Math.log(1-x)*b-lbeta)/a;return front*betaCF(a,b,x);}
+function betaCF(a,b,x){const MAXIT=100,EPS=3e-7,FPMIN=1e-30,qab=a+b,qap=a+1,qam=a-1;let c=1,d=1-qab*x/qap;if(Math.abs(d)<FPMIN)d=FPMIN;d=1/d;let h=d;for(let m=1;m<=MAXIT;m++){const m2=2*m;let aa=m*(b-m)*x/((qam+m2)*(a+m2));d=1+aa*d;if(Math.abs(d)<FPMIN)d=FPMIN;c=1+aa/c;if(Math.abs(c)<FPMIN)c=FPMIN;d=1/d;h*=d*c;aa=-(a+m)*(qab+m)*x/((a+m2)*(qap+m2));d=1+aa*d;if(Math.abs(d)<FPMIN)d=FPMIN;c=1+aa/c;if(Math.abs(c)<FPMIN)c=FPMIN;d=1/d;const del=d*c;h*=del;if(Math.abs(del-1)<EPS)break;}return h;}
+function twoTailP(t,df){return 2*(1-tDistCDF(Math.abs(t),df));}
+function tDistCDF(t,df){return 1-incompleteBeta(.5*df,.5,df/(df+t*t));}
+function fDistP(F,df1,df2){if(F<=0)return 1;return incompleteBeta(df2/2,df1/2,df2/(df2+df1*F));}
+function chi2P(x,k){if(x<0)return 1;return 1-regGammaInc(k/2,x/2);}
+function regGammaInc(a,x){if(x<=0)return 0;let s=1/a,term=1/a;for(let n=1;n<200;n++){term*=x/(a+n);s+=term;if(Math.abs(term)<1e-12*Math.abs(s))break;}return Math.min(1,s*Math.exp(-x+a*Math.log(x)-lgamma(a)));}
+function normalQ(p){const a=[2.50662823884,-18.61500062529,41.39119773534,-25.44106049637],b=[-8.47351093090,23.08336743743,-21.06224101826,3.13082909833],c=[0.3374754822726147,0.9761690190917186,0.1607979714918209,0.0276438810333863,0.0038405729373609,0.0003951896511349,0.0000321767881768,0.0000002888167364,0.0000003960315187];if(p<0.02425){const q=Math.sqrt(-2*Math.log(p));return(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5])/(((((c[6]*q+c[7])*q+c[8])*q+1)));}if(p>0.97575)return-normalQ(1-p);const q=p-.5,r=q*q;return(((((a[0]*r+a[1])*r+a[2])*r+a[3])*r)*q)/(((((b[0]*r+b[1])*r+b[2])*r+b[3])*r+1));}
+function rankArray(arr){const sorted=[...arr].sort((a,b)=>a-b);return arr.map(v=>{const ii=[...sorted.keys()].filter(i=>sorted[i]===v);return(ii[0]+ii[ii.length-1])/2+1;});}
+function spearman(x,y){const n=x.length,rx=rankArray(x),ry=rankArray(y),d2=rx.map((r,i)=>(r-ry[i])**2);return 1-6*_sum(d2)/(n*(n*n-1));}
+function shapiroWilk(arr){const n=arr.length;if(n<3)return{W:NaN,p:NaN};const sorted=[...arr].sort((a,b)=>a-b),m=_mean(sorted),SS=sorted.reduce((a,x)=>a+(x-m)**2,0),half=Math.floor(n/2),a=[];for(let i=0;i<half;i++)a.push(normalQ((i+1-.375)/(n+.25)));const sa=Math.sqrt(a.reduce((s,v)=>s+v*v,0)),normA=a.map(v=>v/sa);let b=0;for(let i=0;i<half;i++)b+=normA[i]*(sorted[n-1-i]-sorted[i]);const W=Math.min(b*b/SS,1),mu=-1.2725+1.0521*Math.log(n),sigma=1.0308-.26763*Math.log(n),z=(Math.log(1-Math.min(W,.9999))-mu)/sigma,p=Math.max(0,Math.min(1,1-normalCDF(z)));return{W,p};}
+function welchT(a,b){const na=a.length,nb=b.length,ma=_mean(a),mb=_mean(b),va=_sVar(a),vb=_sVar(b),t=(ma-mb)/Math.sqrt(va/na+vb/nb),df=(va/na+vb/nb)**2/((va/na)**2/(na-1)+(vb/nb)**2/(nb-1));return{t,df,p:twoTailP(t,df),ma,mb,sda:_sStd(a),sdb:_sStd(b),na,nb};}
+function anova1(groups){const allData=[].concat(...groups),N=allData.length,k=groups.length,gm=_mean(allData);let SSB=0,SSW=0;groups.forEach(g=>{const m=_mean(g);SSB+=g.length*(m-gm)**2;SSW+=g.reduce((a,x)=>a+(x-m)**2,0);});const dfB=k-1,dfW=N-k,MSB=SSB/dfB,MSW=SSW/dfW,F=MSB/MSW;return{F,dfB,dfW,MSB,MSW,SSB,SSW,p:fDistP(F,dfB,dfW),gMeans:groups.map(_mean),gStds:groups.map(_sStd)};}
+function kruskal(groups){const all=[].concat(...groups.map((g,i)=>g.map(v=>({v,g:i}))));all.sort((a,b)=>a.v-b.v);for(let i=0;i<all.length;){let j=i;while(j<all.length&&all[j].v===all[i].v)j++;const r=(i+j-1)/2+1;for(let k=i;k<j;k++)all[k].rank=r;i=j;}const N=all.length,H=12/N/(N+1)*groups.reduce((acc,g,gi)=>{const ri=all.filter(x=>x.g===gi).reduce((s,x)=>s+x.rank,0);return acc+ri*ri/g.length;},0)-3*(N+1);return{H,df:groups.length-1,p:chi2P(H,groups.length-1)};}
+function mannWhitney(a,b){const na=a.length,nb=b.length;let U1=0;for(let i=0;i<na;i++)for(let j=0;j<nb;j++){if(a[i]>b[j])U1++;else if(a[i]===b[j])U1+=.5;}const U=Math.min(U1,na*nb-U1),mu=na*nb/2,sigma=Math.sqrt(na*nb*(na+nb+1)/12),z=(U-mu)/sigma;return{U,z,p:2*(1-normalCDF(Math.abs(z)))};}
+function linReg(x,y){const n=x.length,mx=_mean(x),my=_mean(y),b=x.reduce((s,xi,i)=>s+(xi-mx)*(y[i]-my),0)/x.reduce((s,xi)=>s+(xi-mx)**2,0),a_=my-b*mx,yhat=x.map(xi=>a_+b*xi),SSres=y.reduce((s,yi,i)=>s+(yi-yhat[i])**2,0),SStot=y.reduce((s,yi)=>s+(yi-my)**2,0),R2=1-SSres/SStot,F=(SStot-SSres)/1/(SSres/(n-2));return{a:a_,b,R2,F,p:fDistP(F,1,n-2),se:Math.sqrt(SSres/(n-2)),n,yhat};}
+function pettitt(arr){const n=arr.length,ranks=rankArray(arr),U=[];for(let t=1;t<n;t++){const u=2*_sum(ranks.slice(0,t))-t*(n+1);U.push(Math.abs(u));}const K=Math.max(...U),cp=U.indexOf(K)+1,p=Math.min(1,2*Math.exp(-6*K*K/(n*n*n+n*n)));return{K,cp,p,U};}
+function tukeyQ(k,df){const t={2:{5:3.64,10:3.15,20:2.95,40:2.86,120:2.80},3:{5:4.60,10:3.88,20:3.58,40:3.44,120:3.36},4:{5:5.22,10:4.33,20:3.96,40:3.79,120:3.69},5:{5:5.67,10:4.65,20:4.23,40:4.04,120:3.92}};const kc=Math.min(5,Math.max(2,k)),dfs=Object.keys(t[kc]).map(Number).sort((a,b)=>a-b);let best=dfs[dfs.length-1];for(const d of dfs)if(df<=d){best=d;break;}return t[kc][best]||3.5;}
+
+// ============================================================
+// DATE PARSING — handles Excel serial, JS Date, ISO string
+// ============================================================
+function parseDate(v){
+  if(v===null||v===undefined||v==='') return '';
+  if(v instanceof Date) return isNaN(v.getTime())?'':v.toISOString().slice(0,10);
+  if(typeof v==='number'){
+    // Excel serial date
+    const d=new Date(Math.round((v-25569)*86400*1000));
+    return isNaN(d.getTime())?String(v):d.toISOString().slice(0,10);
+  }
+  const s=String(v).trim();
+  // Already YYYY-MM-DD or ISO with time
+  const m=s.match(/^(\d{4}-\d{2}-\d{2})/);
+  if(m) return m[1];
+  // DD/MM/YYYY
+  const m2=s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  if(m2) return `${m2[3]}-${m2[2]}-${m2[1]}`;
+  const d=new Date(s);
+  return isNaN(d.getTime())?s:d.toISOString().slice(0,10);
+}
+
+// ============================================================
+// FILE LOADING
+// ============================================================
+document.getElementById('fileInput').addEventListener('change',e=>loadFile(e.target.files[0]));
+const dz=document.getElementById('dropzone');
+dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('drag');});
+dz.addEventListener('dragleave',()=>dz.classList.remove('drag'));
+dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('drag');loadFile(e.dataTransfer.files[0]);});
+
+function loadFile(file){
+  if(!file) return;
+  const ext=file.name.split('.').pop().toLowerCase();
+  const reader=new FileReader();
+  reader.onload=e=>{
+    let rawRows;
+    if(ext==='csv'){
+      rawRows=parseCSV(e.target.result);
+    } else {
+      // cellDates:true = JS Date objects instead of serials
+      const wb=XLSX.read(e.target.result,{type:'array',cellDates:true});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      rawRows=XLSX.utils.sheet_to_json(ws,{raw:false,defval:''});
+    }
+    // CRITICAL: strip trailing/leading whitespace from ALL keys
+    RAW=rawRows.map(row=>{
+      const clean={};
+      Object.keys(row).forEach(k=>{ clean[k.trim()]=row[k]; });
+      return clean;
+    });
+    console.log('Columns detected:', Object.keys(RAW[0]));
+    console.log('First row:', RAW[0]);
+    showColumnMapper();
+  };
+  if(ext==='csv') reader.readAsText(file);
+  else reader.readAsArrayBuffer(file);
+}
+
+function parseCSV(text){
+  const lines=text.trim().split('\n'),hdrs=lines[0].split(',').map(h=>h.trim().replace(/^"|"$/g,''));
+  return lines.slice(1).map(l=>{const vs=l.split(',').map(v=>v.trim().replace(/^"|"$/g,''));const o={};hdrs.forEach((h,i)=>o[h]=vs[i]||'');return o;});
+}
+
+// ============================================================
+// COLUMN MAPPER
+// ============================================================
+function showColumnMapper(){
+  if(!RAW.length) return;
+  const rawCols=Object.keys(RAW[0]);
+  const fields=[
+    {id:'colDate',label:'Coluna de Data',hint:'obrigatório'},
+    {id:'colTrat',label:'Tratamento / Grupo',hint:'obrigatório'},
+    {id:'colRep', label:'Réplica / Mesocosmo',hint:'opcional'},
+    {id:'colVar1',label:'Variável 1 (CH₄)',hint:'obrigatório'},
+    {id:'colVar2',label:'Variável 2 (CO₂)',hint:'opcional'},
+    {id:'colDP1', label:'DP Variável 1',hint:'opcional'},
+    {id:'colDP2', label:'DP Variável 2',hint:'opcional'},
+    {id:'colMin1',label:'Mín Variável 1',hint:'opcional'},
+    {id:'colMax1',label:'Máx Variável 1',hint:'opcional'},
+    {id:'colMin2',label:'Mín Variável 2',hint:'opcional'},
+    {id:'colMax2',label:'Máx Variável 2',hint:'opcional'},
+  ];
+  const grid=document.getElementById('col-grid');
+  grid.innerHTML='';
+  fields.forEach(f=>{
+    const div=document.createElement('div');div.className='col-item';
+    div.innerHTML=`<label>${f.label} <span style="color:var(--text-muted)">(${f.hint})</span></label>
+      <select id="${f.id}">
+        <option value="">-- não usar --</option>
+        ${rawCols.map(c=>`<option value="${c}"${autoMatch(f.id,c)?' selected':''}>${c}</option>`).join('')}
+      </select>`;
+    grid.appendChild(div);
+  });
+  document.getElementById('col-map-section').style.display='block';
+}
+
+function autoMatch(fid,col){
+  const c=col.toLowerCase();
+  const map={
+    colDate:['data','date','time','tempo','dia'],
+    colTrat:['tratamento','tratatmento','trat','treatment','grupo'],
+    colRep: ['mesocosmos','mesocosmo','replica','rep'],
+    colVar1:['ch4_media','ch4media','ch4'],
+    colVar2:['co2_media','co2media','co2'],
+    colDP1: ['ch4_dp','dp_ch4','sd_ch4'],
+    colDP2: ['co2_dp','dp_co2','sd_co2'],
+    colMin1:['ch4_min','min_ch4'],
+    colMax1:['ch4_max','max_ch4'],
+    colMin2:['co2_min','min_co2'],
+    colMax2:['co2_max','max_co2'],
+  };
+  // Exact match first, then includes
+  return (map[fid]||[]).some(k=>c===k||c.includes(k));
+}
+
+function selVal(id){const el=document.getElementById(id);return el&&el.value?el.value:null;}
+
+// ============================================================
+// BUILD STATE — called once when user clicks "Executar"
+// ============================================================
+function buildState(){
+  COLS={
+    date: selVal('colDate'), trat: selVal('colTrat'), rep:  selVal('colRep'),
+    var1: selVal('colVar1'), var2: selVal('colVar2'),
+    dp1:  selVal('colDP1'),  dp2:  selVal('colDP2'),
+    min1: selVal('colMin1'), max1: selVal('colMax1'),
+    min2: selVal('colMin2'), max2: selVal('colMax2'),
+  };
+  if(!COLS.date||!COLS.trat||!COLS.var1) throw new Error('Selecione Data, Tratamento e Variável 1.');
+
+  // Detect numeric columns — exclude date, trat, rep
+  const exclude=new Set([COLS.date,COLS.trat,COLS.rep].filter(Boolean));
+  ALL_NUM_COLS=Object.keys(RAW[0]).filter(k=>{
+    if(exclude.has(k)) return false;
+    // Check if majority of rows have numeric values
+    const vals=RAW.slice(0,20).map(r=>parseFloat(String(r[k]).replace(',','.'))).filter(x=>!isNaN(x)&&isFinite(x));
+    return vals.length>=1;
+  });
+
+  // Parse in-place
+  RAW=RAW.map(row=>{
+    const r={...row};
+    r[COLS.date]=parseDate(r[COLS.date]);
+    ALL_NUM_COLS.forEach(k=>{
+      if(r[k]===''||r[k]===null||r[k]===undefined){r[k]=null;return;}
+      const v=parseFloat(String(r[k]).replace(',','.'));
+      r[k]=isNaN(v)||!isFinite(v)?null:v;
+    });
+    return r;
+  });
+
+  TREATS=[...new Set(RAW.map(r=>String(r[COLS.trat]||'').trim()))].filter(Boolean);
+  DATES=[...new Set(RAW.map(r=>String(r[COLS.date]||'').trim()))].filter(d=>d&&d.length>=6).sort();
+
+  console.log('TREATS:', TREATS);
+  console.log('DATES:', DATES);
+  console.log('ALL_NUM_COLS:', ALL_NUM_COLS);
+}
+
+// ============================================================
+// DATA ACCESSORS
+// ============================================================
+function getVals(col,trat=null){
+  return RAW
+    .filter(r=>trat===null||String(r[COLS.trat]||'').trim()===trat)
+    .map(r=>r[col])
+    .filter(x=>x!==null&&!isNaN(x)&&isFinite(x));
+}
+function getGrouped(col){return TREATS.map(t=>getVals(col,t));}
+function getTS(col,trat){
+  return DATES.map(d=>{
+    const rows=RAW.filter(r=>r[COLS.date]===d&&String(r[COLS.trat]||'').trim()===trat);
+    const vals=rows.map(r=>r[col]).filter(x=>x!==null&&!isNaN(x));
+    return vals.length?{date:d,mean:_mean(vals),std:vals.length>1?_sStd(vals):0,n:vals.length}:null;
+  }).filter(Boolean);
+}
+
+// ============================================================
+// POPULATE SELECTORS
+// ============================================================
+function populateSelectors(){
+  const varOpts=ALL_NUM_COLS.map(c=>`<option value="${c}">${c}</option>`).join('');
+  const tratOpts=TREATS.map(t=>`<option value="${t}">${t}</option>`).join('');
+  const allTrat=`<option value="ALL">Todos</option>`+tratOpts;
+
+  ['tt-var','anova-var','reg-x','reg-y','np-var','ts-var','pet-var','overview-var'].forEach(id=>{
+    const el=document.getElementById(id);if(el)el.innerHTML=varOpts;
+  });
+  const regY=document.getElementById('reg-y');
+  if(regY&&ALL_NUM_COLS.length>1) regY.value=ALL_NUM_COLS[1];
+
+  document.getElementById('tt-groupA').innerHTML=tratOpts;
+  document.getElementById('tt-groupB').innerHTML=tratOpts;
+  if(TREATS.length>1) document.getElementById('tt-groupB').value=TREATS[1];
+
+  ['reg-trat','ts-trat','pet-trat'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML=allTrat;});
+}
+
+// ============================================================
+// SHOW UPLOAD (voltar para nova planilha)
+// ============================================================
+function showUpload(){
+  document.getElementById('dashboard').style.display='none';
+  document.getElementById('dropzone').style.display='block';
+  document.getElementById('col-map-section').style.display='none';
+  // Reset file input so same file can be re-uploaded
+  document.getElementById('fileInput').value='';
+}
+
+// ============================================================
+// MAIN
+// ============================================================
+function runAnalysis(){
+  document.getElementById('loading').classList.add('show');
+  setTimeout(()=>{
+    try{
+      buildState();
+      populateSelectors();
+      renderOverview();
+      renderNormality();
+      renderRawTable();
+      document.getElementById('dashboard').style.display='block';
+      document.getElementById('col-map-section').style.display='none';
+      document.getElementById('dropzone').style.display='none';
+    }catch(err){alert('Erro: '+err.message);console.error(err);}
+    document.getElementById('loading').classList.remove('show');
+  },80);
+}
+
+// ============================================================
+// OVERVIEW
+// ============================================================
+function renderOverview(){
+  const ovSel=document.getElementById('overview-var');
+  const activeCol=(ovSel&&ovSel.value)?ovSel.value:COLS.var1;
+  const v1=getVals(activeCol),neg=v1.filter(x=>x<0).length;
+  const cards=[
+    {l:'N registros',v:RAW.length,s:'linhas carregadas'},
+    {l:'Tratamentos',v:TREATS.length,s:TREATS.join(', ')},
+    {l:'Datas / coletas',v:DATES.length,s:DATES[0]+' → '+DATES[DATES.length-1]},
+    {l:'Média '+activeCol,v:_mean(v1).toFixed(2),s:'±'+_sStd(v1).toFixed(2)+' DP'},
+    {l:'Mediana '+activeCol,v:_med(v1).toFixed(2),s:'Q1='+_q(v1,.25).toFixed(2)+' Q3='+_q(v1,.75).toFixed(2)},
+    {l:'Mín '+activeCol,v:Math.min(...v1).toFixed(2),s:'valor mínimo'},
+    {l:'Máx '+activeCol,v:Math.max(...v1).toFixed(2),s:'valor máximo'},
+    {l:'Colunas numéricas',v:ALL_NUM_COLS.length,s:ALL_NUM_COLS.join(', ')},
+  ];
+  if(neg>0) cards.push({l:'Neg. em '+activeCol,v:neg,s:'sumidouros?',warn:true});
+  if(COLS.var2&&activeCol!==COLS.var2){const v2=getVals(COLS.var2);if(v2.length) cards.push({l:'Média '+COLS.var2,v:_mean(v2).toFixed(2),s:'±'+_sStd(v2).toFixed(2)+' DP'});}
+  document.getElementById('stat-cards').innerHTML=cards.map(c=>`<div class="stat-card">
+    <div class="label">${c.l}</div>
+    <div class="value" style="${c.warn?'color:var(--warn)':''}">${c.v}</div>
+    <div class="sub">${c.s}</div></div>`).join('');
+
+  // Update chart title
+  const titleEl=document.getElementById('chart-box-title');
+  if(titleEl) titleEl.textContent=`Média por tratamento — ${activeCol}`;
+
+  const groups=getGrouped(activeCol);
+  if(chartBox) chartBox.destroy();
+  chartBox=new Chart(document.getElementById('chart-box'),{type:'bar',
+    data:{labels:TREATS,datasets:[{label:'Média',data:groups.map(g=>+_mean(g).toFixed(3)),
+      backgroundColor:COLORS.map(c=>c+'33'),borderColor:COLORS,borderWidth:2,borderRadius:4}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{afterBody:(ctx)=>{const g=groups[ctx[0].dataIndex];
+        return[`Mediana: ${_med(g).toFixed(2)}`,`DP: ${_sStd(g).toFixed(2)}`,`Mín: ${Math.min(...g).toFixed(2)}`,`Máx: ${Math.max(...g).toFixed(2)}`,`n=${g.length}`];}}}},
+      scales:{y:{title:{display:true,text:activeCol},grid:{color:'#f0f0f0'}},x:{grid:{display:false}}}}});
+
+  const lineDS=TREATS.map((t,i)=>{const ts=getTS(activeCol,t);
+    return{label:t,data:ts.map(p=>({x:p.date,y:+p.mean.toFixed(3)})),
+      borderColor:COLORS[i%COLORS.length],backgroundColor:COLORS[i%COLORS.length]+'44',tension:.3,pointRadius:5,fill:false};});
+  if(chartTime) chartTime.destroy();
+  chartTime=new Chart(document.getElementById('chart-time'),{type:'line',data:{datasets:lineDS},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom',labels:{boxWidth:12,font:{size:11}}}},
+      scales:{x:{type:'category',title:{display:true,text:'Data'},grid:{color:'#f0f0f0'}},
+              y:{title:{display:true,text:activeCol},grid:{color:'#f0f0f0'}}}}});
+
+  if(COLS.var2){
+    document.getElementById('scatter-card').style.display='block';
+    const scDS=TREATS.map((t,i)=>({label:t,
+      data:RAW.filter(r=>String(r[COLS.trat]||'').trim()===t).map(r=>({x:r[COLS.var1],y:r[COLS.var2]})).filter(p=>p.x!==null&&p.y!==null),
+      backgroundColor:COLORS[i%COLORS.length]+'99',borderColor:COLORS[i%COLORS.length],pointRadius:5}));
+    if(chartScatter) chartScatter.destroy();
+    chartScatter=new Chart(document.getElementById('chart-scatter'),{type:'scatter',data:{datasets:scDS},
+      options:{responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{position:'bottom',labels:{boxWidth:12,font:{size:11}}}},
+        scales:{x:{title:{display:true,text:COLS.var1},grid:{color:'#f0f0f0'}},y:{title:{display:true,text:COLS.var2},grid:{color:'#f0f0f0'}}}}});}
+}
+
+// ============================================================
+// NORMALITY
+// ============================================================
+function renderNormality(){
+  const testCols=[COLS.var1,COLS.var2].filter(Boolean);
+  let html='';
+  testCols.forEach(col=>{
+    html+=`<div class="result-box"><h4>Shapiro-Wilk — ${col}</h4>`;
+    TREATS.forEach(t=>{const d=getVals(col,t);
+      if(d.length<3){html+=`<div class="result-row"><span class="rk">${t}</span><span class="rv" style="color:var(--text-muted)">n insuficiente (${d.length})</span></div>`;return;}
+      const sw=shapiroWilk(d),norm=sw.p>=.05;
+      html+=`<div class="result-row"><span class="rk">${t} (n=${d.length})</span>
+        <span class="rv">W=${sw.W.toFixed(4)} p=${sw.p.toFixed(4)}<span class="sig-chip ${norm?'sig-yes':'sig-no'}">${norm?'Normal':'Não-normal'}</span></span></div>`;});
+    const all=getVals(col);if(all.length>=3){const sw=shapiroWilk(all),norm=sw.p>=.05;
+      html+=`<div class="result-row" style="background:#f8f9fa"><span class="rk"><strong>Todos os grupos</strong> (n=${all.length})</span>
+        <span class="rv">W=${sw.W.toFixed(4)} p=${sw.p.toFixed(4)}<span class="sig-chip ${norm?'sig-yes':'sig-no'}">${norm?'Normal':'Não-normal'}</span></span></div>`;}
+    html+='</div>';});
+  document.getElementById('normality-results').innerHTML=html||'<div class="notice notice-warn">Nenhuma variável.</div>';
+}
+
+// ============================================================
+// T-TEST
+// ============================================================
+function runTTest(){
+  const col=selVal('tt-var'),gA=document.getElementById('tt-groupA').value,gB=document.getElementById('tt-groupB').value;
+  if(!col||gA===gB){document.getElementById('ttest-results').innerHTML='<div class="notice notice-warn">Selecione variável e grupos diferentes.</div>';return;}
+  const a=getVals(col,gA),b=getVals(col,gB);
+  if(a.length<2||b.length<2){document.getElementById('ttest-results').innerHTML='<div class="notice notice-warn">n mínimo = 2 por grupo.</div>';return;}
+  const r=welchT(a,b),sig=r.p<.05,sig01=r.p<.01;
+  const d=Math.abs(r.ma-r.mb)/Math.sqrt((_sVar(a)+_sVar(b))/2);
+  const dLab=d<.2?'desprezível':d<.5?'pequeno':d<.8?'médio':'grande';
+  document.getElementById('ttest-results').innerHTML=`<div class="result-box">
+    <h4>Teste t de Welch — ${col}: ${gA} vs ${gB}</h4>
+    <div class="result-row"><span class="rk">Média ${gA}</span><span class="rv">${r.ma.toFixed(4)} (DP=${r.sda.toFixed(4)}, n=${r.na})</span></div>
+    <div class="result-row"><span class="rk">Média ${gB}</span><span class="rv">${r.mb.toFixed(4)} (DP=${r.sdb.toFixed(4)}, n=${r.nb})</span></div>
+    <div class="result-row"><span class="rk">Diferença</span><span class="rv">${(r.ma-r.mb).toFixed(4)}</span></div>
+    <div class="result-row"><span class="rk">t</span><span class="rv">${r.t.toFixed(4)}</span></div>
+    <div class="result-row"><span class="rk">gl (Welch)</span><span class="rv">${r.df.toFixed(1)}</span></div>
+    <div class="result-row"><span class="rk">p-valor (bicaudal)</span><span class="rv">${r.p.toFixed(4)}
+      <span class="sig-chip ${sig?'sig-yes':'sig-no'}">${sig?'Significativo':'Não-significativo'}</span>
+      ${sig01?'<span class="sig-chip sig-yes">p&lt;0.01</span>':''}</span></div>
+    <div class="result-row"><span class="rk">Cohen\'s d</span><span class="rv">${d.toFixed(3)} — ${dLab}</span></div>
+  </div>
+  <div class="notice ${sig?'notice-ok':'notice-info'}">${sig?`✅ Diferença significativa (α=0.05).`:`ℹ️ Sem diferença significativa (α=0.05).`}</div>`;}
+
+// ============================================================
+// ANOVA
+// ============================================================
+function runANOVA(){
+  const col=selVal('anova-var');if(!col){document.getElementById('anova-results').innerHTML='<div class="notice notice-warn">Selecione variável.</div>';return;}
+  const gd=TREATS.map(t=>({t,g:getVals(col,t)})).filter(x=>x.g.length>=2);
+  if(gd.length<2){document.getElementById('anova-results').innerHTML='<div class="notice notice-warn">Precisa de ≥ 2 grupos com n ≥ 2.</div>';return;}
+  const r=anova1(gd.map(x=>x.g)),sig=r.p<.05;
+  let html=`<div class="result-box"><h4>ANOVA One-Way — ${col}</h4>
+    <div class="result-row"><span class="rk">Entre grupos</span><span class="rv">SS=${r.SSB.toFixed(1)} df=${r.dfB} MS=${r.MSB.toFixed(1)} F=<strong>${r.F.toFixed(3)}</strong> p=${r.p.toFixed(4)}<span class="sig-chip ${sig?'sig-yes':'sig-no'}">${sig?'Sig.':'n.s.'}</span></span></div>
+    <div class="result-row"><span class="rk">Dentro dos grupos</span><span class="rv">SS=${r.SSW.toFixed(1)} df=${r.dfW} MS=${r.MSW.toFixed(1)}</span></div></div>
+  <div class="result-box"><h4>Médias por grupo</h4>`;
+  gd.forEach(({t},i)=>{html+=`<div class="result-row"><span class="rk">${t}</span><span class="rv">${r.gMeans[i].toFixed(4)} ± ${r.gStds[i].toFixed(4)}</span></div>`;});
+  html+='</div>';
+  if(sig){
+    html+=`<div class="result-box"><h4>Tukey HSD (post-hoc)</h4>`;
+    const qcrit=tukeyQ(gd.length,r.dfW);
+    for(let i=0;i<gd.length;i++)for(let j=i+1;j<gd.length;j++){
+      const diff=Math.abs(r.gMeans[i]-r.gMeans[j]),se=Math.sqrt(r.MSW*(1/gd[i].g.length+1/gd[j].g.length)/2),q=diff/se,s=q>qcrit;
+      html+=`<div class="result-row"><span class="rk">${gd[i].t} vs ${gd[j].t}</span><span class="rv">Δ=${diff.toFixed(3)} q=${q.toFixed(3)}<span class="sig-chip ${s?'sig-yes':'sig-no'}">${s?'Sig.':'n.s.'}</span></span></div>`;}
+    html+='</div>';}
+  html+=`<div class="notice ${sig?'notice-ok':'notice-info'}">${sig?'✅ Diferença entre grupos (α=0.05). Veja post-hoc.':'ℹ️ Sem diferença entre grupos (α=0.05).'}</div>`;
+  document.getElementById('anova-results').innerHTML=html;}
+
+// ============================================================
+// REGRESSION
+// ============================================================
+function runRegression(){
+  const xc=selVal('reg-x'),yc=selVal('reg-y'),trat=document.getElementById('reg-trat').value;
+  if(!xc||!yc||xc===yc){document.getElementById('regression-results').innerHTML='<div class="notice notice-warn">Selecione X e Y diferentes.</div>';return;}
+  const rows=trat==='ALL'?RAW:RAW.filter(r=>String(r[COLS.trat]||'').trim()===trat);
+  const pairs=rows.map(r=>({x:r[xc],y:r[yc]})).filter(p=>p.x!==null&&p.y!==null&&!isNaN(p.x)&&!isNaN(p.y));
+  if(pairs.length<4){document.getElementById('regression-results').innerHTML='<div class="notice notice-warn">n mínimo = 4.</div>';return;}
+  const xs=pairs.map(p=>p.x),ys=pairs.map(p=>p.y),r=linReg(xs,ys),rho=spearman(xs,ys),sig=r.p<.05;
+  document.getElementById('regression-results').innerHTML=`<div class="result-box">
+    <h4>Regressão Linear — ${yc} ~ ${xc}${trat!=='ALL'?' ('+trat+')':''}</h4>
+    <div class="result-row"><span class="rk">Equação</span><span class="rv">${yc} = ${r.a.toFixed(4)} + ${r.b.toFixed(4)}×${xc}</span></div>
+    <div class="result-row"><span class="rk">R²</span><span class="rv">${r.R2.toFixed(4)} (${(r.R2*100).toFixed(1)}%)</span></div>
+    <div class="result-row"><span class="rk">F / p</span><span class="rv">${r.F.toFixed(3)} / ${r.p.toFixed(4)}<span class="sig-chip ${sig?'sig-yes':'sig-no'}">${sig?'Sig.':'n.s.'}</span></span></div>
+    <div class="result-row"><span class="rk">Erro padrão</span><span class="rv">${r.se.toFixed(4)}</span></div>
+    <div class="result-row"><span class="rk">Spearman ρ</span><span class="rv">${rho.toFixed(4)}</span></div>
+    <div class="result-row"><span class="rk">n</span><span class="rv">${r.n}</span></div></div>`;
+  if(chartReg) chartReg.destroy();
+  const xs2=[...xs].sort((a,b)=>a-b);
+  chartReg=new Chart(document.getElementById('chart-reg'),{type:'scatter',
+    data:{datasets:[
+      {label:'Dados',data:pairs.map(p=>({x:p.x,y:p.y})),backgroundColor:'#1a6fdf88',borderColor:'#1a6fdf',pointRadius:5},
+      {label:`R²=${r.R2.toFixed(3)}`,data:xs2.map(x=>({x,y:r.a+r.b*x})),type:'line',borderColor:'#e85d26',backgroundColor:'transparent',pointRadius:0,borderWidth:2,tension:0}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom',labels:{boxWidth:12,font:{size:11}}}},
+      scales:{x:{title:{display:true,text:xc},grid:{color:'#f0f0f0'}},y:{title:{display:true,text:yc},grid:{color:'#f0f0f0'}}}}});}
+
+// ============================================================
+// TIME SERIES
+// ============================================================
+function runTimeSeries(){
+  const col=selVal('ts-var'),trat=document.getElementById('ts-trat').value;
+  const targets=trat==='ALL'?TREATS:[trat];let html='';const ds=[];
+  targets.forEach((t,ci)=>{const ts=getTS(col,t);if(ts.length<2)return;
+    const vals=ts.map(p=>p.mean),xn=vals.map((_,i)=>i),r=linReg(xn,vals),rho=spearman(xn,vals);
+    const cv=(_sStd(vals)/Math.abs(_mean(vals))*100);
+    html+=`<div class="result-box"><h4>Tratamento: ${t}</h4>
+      <div class="result-row"><span class="rk">Tendência</span><span class="rv">${r.b>0?'↗ Crescente':'↘ Decrescente'} (b=${r.b.toFixed(4)})</span></div>
+      <div class="result-row"><span class="rk">R² tendência</span><span class="rv">${r.R2.toFixed(4)}</span></div>
+      <div class="result-row"><span class="rk">CV</span><span class="rv">${cv.toFixed(1)}%</span></div>
+      <div class="result-row"><span class="rk">Spearman ρ (tempo)</span><span class="rv">${rho.toFixed(4)}</span></div>
+      <div class="result-row"><span class="rk">Mín / Máx</span><span class="rv">${Math.min(...vals).toFixed(2)} / ${Math.max(...vals).toFixed(2)}</span></div></div>`;
+    ds.push({label:t,data:ts.map(p=>({x:p.date,y:+p.mean.toFixed(3)})),borderColor:COLORS[ci%COLORS.length],backgroundColor:COLORS[ci%COLORS.length]+'33',pointRadius:5,tension:.2,fill:false});
+    ds.push({label:'',data:ts.map((p,i)=>({x:p.date,y:+(r.a+r.b*i).toFixed(3)})),borderColor:COLORS[ci%COLORS.length],borderDash:[5,4],pointRadius:0,borderWidth:1.5,backgroundColor:'transparent',fill:false});});
+  document.getElementById('ts-results').innerHTML=html||'<div class="notice notice-warn">Nenhuma série.</div>';
+  if(chartTs) chartTs.destroy();
+  chartTs=new Chart(document.getElementById('chart-ts'),{type:'line',data:{datasets:ds},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom',labels:{boxWidth:12,font:{size:11},filter:i=>i.text!==''}}},
+      scales:{x:{type:'category',title:{display:true,text:'Data'},grid:{color:'#f0f0f0'}},y:{title:{display:true,text:col},grid:{color:'#f0f0f0'}}}}});}
+
+// ============================================================
+// PETTITT
+// ============================================================
+function runPettitt(){
+  const col=selVal('pet-var'),trat=document.getElementById('pet-trat').value;
+  let series,labels;
+  if(trat==='ALL'){
+    labels=DATES;
+    series=DATES.map(d=>{const rows=RAW.filter(r=>r[COLS.date]===d),vals=rows.map(r=>r[col]).filter(x=>x!==null&&!isNaN(x));return vals.length?_mean(vals):null;}).filter(x=>x!==null);
+  } else {const ts=getTS(col,trat);series=ts.map(p=>p.mean);labels=ts.map(p=>p.date);}
+  if(series.length<4){document.getElementById('pettitt-results').innerHTML='<div class="notice notice-warn">Série muito curta (n&lt;4).</div>';return;}
+  const r=pettitt(series),cpDate=labels[Math.min(r.cp,labels.length-1)]||`ponto ${r.cp}`,sig=r.p<.05;
+  const v1=series.slice(0,r.cp),v2=series.slice(r.cp);
+  document.getElementById('pettitt-results').innerHTML=`<div class="result-box">
+    <h4>Pettitt — ${col}${trat!=='ALL'?' ('+trat+')':''}</h4>
+    <div class="result-row"><span class="rk">Estatística K</span><span class="rv">${r.K}</span></div>
+    <div class="result-row"><span class="rk">Ponto de mudança</span><span class="rv">índice ${r.cp} — ${cpDate}</span></div>
+    <div class="result-row"><span class="rk">p-valor</span><span class="rv">${r.p.toFixed(4)}<span class="sig-chip ${sig?'sig-yes':'sig-warn'}">${sig?'Mudança detectada':'Não significativo'}</span></span></div>
+    <div class="result-row"><span class="rk">Média antes</span><span class="rv">${v1.length?_mean(v1).toFixed(3):'—'}</span></div>
+    <div class="result-row"><span class="rk">Média após</span><span class="rv">${v2.length?_mean(v2).toFixed(3):'—'}</span></div>
+    <div class="result-row"><span class="rk">n série</span><span class="rv">${series.length}</span></div></div>
+  <div class="notice ${sig?'notice-ok':'notice-warn'}">${sig?`✅ Mudança em ${cpDate}.`:`⚠️ Sem mudança significativa (n=${series.length}).`}</div>`;
+  if(chartPet) chartPet.destroy();
+  chartPet=new Chart(document.getElementById('chart-pet'),{type:'line',
+    data:{labels,datasets:[
+      {label:'Antes',data:series.map((v,i)=>i<r.cp?v:null),borderColor:'#1a6fdf',backgroundColor:'#1a6fdf22',pointRadius:5,fill:true,tension:.2,spanGaps:false},
+      {label:'Após', data:series.map((v,i)=>i>=r.cp?v:null),borderColor:'#e85d26',backgroundColor:'#e85d2622',pointRadius:5,fill:true,tension:.2,spanGaps:false}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom'}},
+      scales:{x:{title:{display:true,text:'Data'},grid:{color:'#f0f0f0'}},y:{title:{display:true,text:col},grid:{color:'#f0f0f0'}}}}});}
+
+// ============================================================
+// NON-PARAM
+// ============================================================
+function runNonParam(){
+  const col=selVal('np-var');if(!col){document.getElementById('nonparam-results').innerHTML='<div class="notice notice-warn">Selecione variável.</div>';return;}
+  const gd=TREATS.map(t=>({t,g:getVals(col,t)})).filter(x=>x.g.length>=2);
+  if(gd.length<2){document.getElementById('nonparam-results').innerHTML='<div class="notice notice-warn">Dados insuficientes.</div>';return;}
+  const kw=kruskal(gd.map(x=>x.g)),kwSig=kw.p<.05;
+  let html=`<div class="result-box"><h4>Kruskal-Wallis — ${col}</h4>
+    <div class="result-row"><span class="rk">H</span><span class="rv">${kw.H.toFixed(4)}</span></div>
+    <div class="result-row"><span class="rk">gl</span><span class="rv">${kw.df}</span></div>
+    <div class="result-row"><span class="rk">p</span><span class="rv">${kw.p.toFixed(4)}<span class="sig-chip ${kwSig?'sig-yes':'sig-no'}">${kwSig?'Sig.':'n.s.'}</span></span></div></div>`;
+  html+=`<div class="result-box"><h4>Mann-Whitney U (pares)</h4>`;
+  for(let i=0;i<gd.length;i++)for(let j=i+1;j<gd.length;j++){
+    const mw=mannWhitney(gd[i].g,gd[j].g),s=mw.p<.05;
+    html+=`<div class="result-row"><span class="rk">${gd[i].t} vs ${gd[j].t}</span><span class="rv">U=${mw.U.toFixed(0)} z=${mw.z.toFixed(3)} p=${mw.p.toFixed(4)}<span class="sig-chip ${s?'sig-yes':'sig-no'}">${s?'Sig.':'n.s.'}</span></span></div>`;}
+  html+='</div>';
+  if(DATES.length>=4){
+    html+=`<div class="result-box"><h4>Spearman ρ (valor × tempo)</h4>`;
+    gd.forEach(({t})=>{const ts=getTS(col,t);if(ts.length<4)return;
+      const rho=spearman(ts.map((_,i)=>i),ts.map(p=>p.mean)),z=rho*Math.sqrt((ts.length-2)/(1-rho**2)),p=2*(1-normalCDF(Math.abs(z)));
+      html+=`<div class="result-row"><span class="rk">${t}</span><span class="rv">ρ=${rho.toFixed(4)} p=${p.toFixed(4)}<span class="sig-chip ${p<.05?'sig-yes':'sig-no'}">${p<.05?'Sig.':'n.s.'}</span></span></div>`;});
+    html+='</div>';}
+  html+=`<div class="notice notice-info">Bonferroni: para ${gd.length*(gd.length-1)/2} pares, use α=${(0.05/(gd.length*(gd.length-1)/2)).toFixed(4)} por teste.</div>`;
+  document.getElementById('nonparam-results').innerHTML=html;}
+
+// ============================================================
+// RAW TABLE
+// ============================================================
+function renderRawTable(){
+  const cols=Object.keys(RAW[0]);
+  document.getElementById('raw-info').textContent=`${RAW.length} linhas × ${cols.length} colunas | Datas: ${DATES.join(', ')} | Tratamentos: ${TREATS.join(', ')}`;
+  const thead=document.querySelector('#raw-table thead'),tbody=document.querySelector('#raw-table tbody');
+  thead.innerHTML=`<tr>${cols.map(c=>`<th>${c}</th>`).join('')}</tr>`;
+  tbody.innerHTML=RAW.slice(0,300).map(row=>`<tr>${cols.map(c=>{const v=row[c];if(v===null||v===''||v===undefined)return'<td style="color:var(--text-muted)">—</td>';const n=typeof v==='number'?v:parseFloat(v);return`<td>${!isNaN(n)&&typeof v!=='string'?n.toFixed(3):v}</td>`;}).join('')}</tr>`).join('');
+  if(RAW.length>300)tbody.innerHTML+=`<tr><td colspan="${cols.length}" style="text-align:center;color:var(--text-muted);font-size:11px">…${RAW.length-300} linhas adicionais omitidas</td></tr>`;}
+
+// ============================================================
+// TABS
+// ============================================================
+function switchTab(name,btn){
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  btn.classList.add('active');}
+
+document.addEventListener('dragover',e=>e.preventDefault());
+</script>
+</body>
+</html>
